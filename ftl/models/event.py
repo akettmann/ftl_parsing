@@ -7,9 +7,26 @@ from .base import ElementModel, JustAttribs, StringLookup
 from ..exceptions import Sad
 
 
-class Augment(JustAttribs, ElementModel):
-    tag_name = "augment"
+class Loot(JustAttribs, ElementModel):
+    tag_name = ("augment", "weapon", "drone")
+    """This holds the name of a loot table that an item will come from as a result of an
+     event"""
     name: str
+
+
+class Remove(JustAttribs, ElementModel):
+    tag_name = "remove"
+    """
+    This says what you will lose when this event happens
+    """
+    name: str
+
+
+class CrewMember(JustAttribs, ElementModel):
+    tag_name = "crewMember"
+    amount: int
+    class_: str = Field(None, alias="class")
+    id_: str = Field(None, alias="id")
 
 
 class Text(ElementModel):
@@ -85,7 +102,16 @@ class AutoReward(ElementModel):
         return cls(**kw)
 
 
+class Boarders(JustAttribs, ElementModel):
+    tag_name = "boarders"
+    breach: bool = False
+    min: int
+    max: int
+    class_: str = Field(alias="class")
+
+
 class Event(ElementModel):
+    _children = ()
     tag_name: ClassVar[str] = "event"
     unique: bool = False
     name: str = None
@@ -96,18 +122,21 @@ class Event(ElementModel):
     store: bool = False
     auto_reward: AutoReward = None
     item_modify: list[EventModifyItem] = Field(default_factory=list)
-    augment: Augment = None
+    loot: list[Loot | CrewMember] = Field(default_factory=list)
+    modify_pursuit: int = None
+    boarders: Boarders = None
 
     @classmethod
     def from_elem(cls, e: Element):
         kw: dict[str, Any] = e.attrib.copy()
         kw["choices"] = choices = []
+        kw["loot"] = loot = []
         for sub in e:
             match sub:
                 case Element(tag=Choice.tag_name):
                     choices.append(Choice.from_elem(sub))
                 case Element(tag="item_modify"):
-                    # item_modify seems to be a
+                    # item_modify seems to be a dumb list, so just using a dumb list
                     kw["item_modify"] = [EventModifyItem.from_elem(i) for i in sub]
                 case Element(tag=Text.tag_name):
                     kw["text"] = Text.from_elem(sub)
@@ -121,11 +150,17 @@ class Event(ElementModel):
                     kw["store"] = True
                 case Element(tag=AutoReward.tag_name):
                     kw["auto_reward"] = AutoReward.from_elem(sub)
-                case Element(tag=Augment.tag_name):
-                    kw["augment"] = Augment.from_elem(sub)
+                case Element(tag=tag) if tag in Loot.tag_name:
+                    loot.append(Loot.from_elem(sub))
+                case Element(tag=CrewMember.tag_name):
+                    loot.append(CrewMember.from_elem(sub))
+                case Element(tag="modifyPursuit", attrib={"amount": a}):
+                    kw["modify_pursuit"] = int(a)
+                case Element(tag=Boarders.tag_name):
+                    kw["boarders"] = Boarders.from_elem(sub)
                 case _:
                     pass
-                    # raise Sad.from_elem(sub)
+                    # raise Sad.from_sub_elem(e, sub)
         return cls(**kw)
 
 
