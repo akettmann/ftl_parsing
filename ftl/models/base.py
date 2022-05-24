@@ -1,10 +1,25 @@
 from abc import abstractmethod
-from typing import ClassVar, TypeVar
+from functools import wraps
+from typing import ClassVar, Type, TypeVar
 from xml.etree.ElementTree import Element
 
 from pydantic import BaseModel as BaseM, Field
 
 from ..data import STRING_DATA
+
+
+class Tracker:
+    _children = set()
+
+    @classmethod
+    def track(cls, c: Type):
+        cls._children.add(c)
+
+        @wraps(c)
+        def inner(*args, **kwargs):
+            return c(*args, **kwargs)
+
+        return inner
 
 
 class JustAttribs:

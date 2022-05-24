@@ -4,7 +4,10 @@ from xml.etree.ElementTree import Element
 from .base import ElementModel, M
 from .event import Event
 from .sector import SectorDescription, SectorType
+from .blueprints import ShipBlueprint
 from ..data import RAW_DATA, STRING_DATA
+
+__all__ = "FTL"
 
 
 def _make_element_dict(return_class: Type[M], *elements: Element) -> dict[str, M]:
@@ -19,6 +22,7 @@ class _FTL(ElementModel):
     sector_descriptions: dict[str, SectorDescription]
     sector_types: dict[str, SectorType]
     events: dict[str, Event]
+    ship_blueprints: dict[str, ShipBlueprint]
     _string_lookup: dict[str:str]
 
     @classmethod
@@ -33,6 +37,9 @@ class _FTL(ElementModel):
             ),
             # recursively finds events where it has an attribute `name` defined
             "events": _make_element_dict(Event, *e.findall(".//event[@name]")),
+            "ship_blueprints": _make_element_dict(
+                ShipBlueprint, *e.iter("shipBlueprint")
+            ),
         }
         return cls(**kwargs)
 
