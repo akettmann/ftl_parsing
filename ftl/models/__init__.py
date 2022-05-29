@@ -19,6 +19,7 @@ def _make_element_dict(return_class: Type[M], *elements: Element) -> dict[str, M
 
 
 class _FTL(ElementModel):
+    tag_name = "FTL"
     sector_descriptions: dict[str, SectorDescription]
     sector_types: dict[str, SectorType]
     events: dict[str, Event]

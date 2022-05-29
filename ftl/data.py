@@ -25,13 +25,13 @@ def _load_data():
     for xmlfp in DATA_DIR.glob("*.xml"):
         try:
             tree = parse(xmlfp)
-        except ParseError as e:
+        except ParseError as err:
             try:
                 tree = _hack(xmlfp)
             except ParseError:
                 LOG.warning(
                     f"File `{str(xmlfp.absolute())}` is not valid XML.\n"
-                    f"Original error: `{e.msg}`"
+                    f"Original error: `{err.msg}`"
                 )
                 continue
         for e in tree.iter("FTL"):

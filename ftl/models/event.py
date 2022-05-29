@@ -1,4 +1,5 @@
-from typing import Any, ClassVar
+from abc import ABC
+from typing import Any, ClassVar, Iterator
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
@@ -7,26 +8,58 @@ from .base import ElementModel, JustAttribs, StringLookup
 from ..exceptions import Sad
 
 
-class Loot(JustAttribs, ElementModel):
-    tag_name = ("augment", "weapon", "drone")
+class Item(StringLookup, JustAttribs, ElementModel):
     """This holds the name of a loot table that an item will come from as a result of an
-     event"""
-    name: str
+    event"""
 
 
-class Remove(JustAttribs, ElementModel):
+class Augment(Item):
+    tag_name = "augment"
+
+
+class Weapon(Item):
+    tag_name = "weapon"
+
+
+class Drone(Item):
+    tag_name = "drone"
+
+
+class Remove(Item):
     tag_name = "remove"
     """
-    This says what you will lose when this event happens
+    This says what you will lose when this event happens, kind of Anti-Loot
     """
-    name: str
 
 
-class CrewMember(JustAttribs, ElementModel):
+class RemoveCrew(Remove):
+    tag_name = "removeCrew"
+    pass
+
+
+class CrewMember(Item):
+    """People are things too apparently"""
+
     tag_name = "crewMember"
     amount: int
     class_: str = Field(None, alias="class")
-    id_: str = Field(None, alias="id")
+
+
+class Damage(Remove):
+    tag_name = "damage"
+
+
+@Damage.attach
+@RemoveCrew.attach
+@Remove.attach
+@Drone.attach
+@Weapon.attach
+@Augment.attach
+@CrewMember.attach
+class EventLoot(ElementModel, ABC):
+    """Using this class to track, not to actually create"""
+
+    pass
 
 
 class Text(ElementModel):
@@ -53,6 +86,15 @@ class Ship(JustAttribs, ElementModel):
     """
     load: str = None
     hostile: bool = False
+
+
+class Fleet(ElementModel):
+    tag_name = "fleet"
+    text: str
+
+    @classmethod
+    def from_elem(cls, e: Element):
+        return cls(text=e.text)
 
 
 class Choice(ElementModel):
@@ -89,6 +131,14 @@ class EventModifyItem(JustAttribs, ElementModel):
     max: int = None
 
 
+class Status(JustAttribs, ElementModel):
+    tag_name = "status"
+    target: str
+    type_: str = Field(alias="type")
+    system: str
+    amount: int
+
+
 class AutoReward(ElementModel):
     tag_name = "autoReward"
     level: str
@@ -110,58 +160,107 @@ class Boarders(JustAttribs, ElementModel):
     class_: str = Field(alias="class")
 
 
+class Quest(ElementModel):
+    tag_name = "quest"
+    event: str
+
+    @classmethod
+    def from_elem(cls, e: Element):
+        return cls(event=e.attrib["event"])
+
+
+class Image(JustAttribs, ElementModel):
+    tag_name = "img"
+    back: str = None
+    planet: str = None
+
+
+class Upgrade(JustAttribs, ElementModel):
+    tag_name = "upgrade"
+    amount: int
+    system: str
+
+
+@Upgrade.attach
+@Image.attach
+@Quest.attach
+@AutoReward.attach
+@Boarders.attach
+@Ship.attach
+@Text.attach
+@Fleet.attach
+@Status.attach
 class Event(ElementModel):
-    _children = ()
     tag_name: ClassVar[str] = "event"
-    unique: bool = False
     name: str = None
     text: Text = None
-    distress_beacon: bool = False
     ship: Ship = None
     choices: list[Choice]
+    distress_beacon: bool = False
+    repair: bool = False
+    reveal_map: bool = False
+    secret_sector: bool = Field(
+        False,
+        description="Indicates that this event triggers the crystal homeworlds sector",
+    )
     store: bool = False
+    unique: bool = False
     auto_reward: AutoReward = None
     item_modify: list[EventModifyItem] = Field(default_factory=list)
-    loot: list[Loot | CrewMember] = Field(default_factory=list)
+    loot: list[Item | CrewMember | Remove] = Field(default_factory=list)
     modify_pursuit: int = None
     boarders: Boarders = None
+    statuses: list[Status] = Field(default_factory=list)
+    quest: Quest = None
+    image: Image = None
+    unlock_ship: int = Field(None, alias="unlockShip")
 
     @classmethod
     def from_elem(cls, e: Element):
         kw: dict[str, Any] = e.attrib.copy()
         kw["choices"] = choices = []
         kw["loot"] = loot = []
-        for sub in e:
+        kw["statuses"] = statuses = []
+        for sub in cls._xml_to_model(e, kw):
             match sub:
                 case Element(tag=Choice.tag_name):
                     choices.append(Choice.from_elem(sub))
+                case Element(tag=tag) if tag in EventLoot._tag_set:
+                    kls = EventLoot._dependents[tag]
+                    loot.append(kls.from_elem(sub))
                 case Element(tag="item_modify"):
                     # item_modify seems to be a dumb list, so just using a dumb list
                     kw["item_modify"] = [EventModifyItem.from_elem(i) for i in sub]
-                case Element(tag=Text.tag_name):
-                    kw["text"] = Text.from_elem(sub)
-                case Element(tag=Ship.tag_name):
-                    kw["ship"] = Ship.from_elem(sub)
                 case Element(tag=Environment.tag_name):
                     kw["environment"] = Environment.from_elem(sub)
-                case Element(tag="distressBeacon"):
-                    kw["distress_beacon"] = True
-                case Element(tag="store"):
-                    kw["store"] = True
-                case Element(tag=AutoReward.tag_name):
-                    kw["auto_reward"] = AutoReward.from_elem(sub)
-                case Element(tag=tag) if tag in Loot.tag_name:
-                    loot.append(Loot.from_elem(sub))
-                case Element(tag=CrewMember.tag_name):
-                    loot.append(CrewMember.from_elem(sub))
+                # booleans
+                case Element(tag=t) if t in {
+                    "distressBeacon",
+                    "store",
+                    "secretSector",
+                    "reveal_map",
+                    "repair",
+                }:
+                    kw[t] = True
                 case Element(tag="modifyPursuit", attrib={"amount": a}):
                     kw["modify_pursuit"] = int(a)
-                case Element(tag=Boarders.tag_name):
-                    kw["boarders"] = Boarders.from_elem(sub)
+                case Element(tag="unlockShip", attrib={"id": num}):
+                    kw["unlockShip"] = int(num)
                 case _:
-                    pass
-                    # raise Sad.from_sub_elem(e, sub)
+                    raise Sad.from_sub_elem(e, sub)
+
         return cls(**kw)
+
+    @classmethod
+    def _xml_to_model(cls, e: Element, kw: dict[str, Any]) -> Iterator[Element]:
+        """This iterates over the sub elements and yields the ones it doesn't handle"""
+        for sub in e:
+            match sub:
+                case Element(tag=tag) if tag in cls._tag_set:
+                    kls: ElementModel = cls._dependents[tag]
+                    kw[kls.py_tag_name()] = kls.from_elem(sub)
+                case _:
+                    yield sub
 
 
 Choice.update_forward_refs()
