@@ -1,86 +1,94 @@
 from abc import ABC
-from typing import Any, ClassVar, Iterator
+from typing import Any, ClassVar, Iterator, Generic
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
 
-from .base import ElementModel, JustAttribs, StringLookup
+from .base import ElementModel, JustAttribs, StringLookup, Tagged, Child, Parent
 from ..exceptions import Sad
 
 
-class Item(StringLookup, JustAttribs, ElementModel):
+class Item(StringLookup, JustAttribs, Child, ABC):
     """This holds the name of a loot table that an item will come from as a result of an
     event"""
 
 
 class Augment(Item):
-    tag_name = "augment"
+    tag_name: ClassVar[str] = "augment"
 
 
 class Weapon(Item):
-    tag_name = "weapon"
+    tag_name: ClassVar[str] = "weapon"
 
 
 class Drone(Item):
-    tag_name = "drone"
+    tag_name: ClassVar[str] = "drone"
 
 
 class Remove(Item):
-    tag_name = "remove"
+    tag_name: ClassVar[str] = "remove"
     """
     This says what you will lose when this event happens, kind of Anti-Loot
     """
 
 
-class RemoveCrew(Remove):
-    tag_name = "removeCrew"
-    pass
-
-
 class CrewMember(Item):
     """People are things too apparently"""
 
-    tag_name = "crewMember"
+    tag_name: ClassVar[str] = "crewMember"
     amount: int
     class_: str = Field(None, alias="class")
 
 
 class Damage(Remove):
-    tag_name = "damage"
+    tag_name: ClassVar[str] = "damage"
 
 
-@Damage.attach
-@RemoveCrew.attach
-@Remove.attach
-@Drone.attach
-@Weapon.attach
-@Augment.attach
-@CrewMember.attach
-class EventLoot(ElementModel, ABC):
+class EventLoot(Parent, ABC):
     """Using this class to track, not to actually create"""
 
     pass
 
 
-class Text(ElementModel):
-    tag_name = "text"
+class Text(Child):
+    tag_name: ClassVar[str] = "text"
     text: str = None
 
     @classmethod
     def from_elem(cls, e: Element):
         kw = e.attrib.copy()
         if e.text and e.text.strip():
-            kw["text"] = e.text
+            kw["text"] = e.text.strip()
         return cls(**kw)
 
 
-class Environment(JustAttribs, ElementModel):
-    tag_name = "environment"
+@Text.attach
+class RemoveCrew(Remove, Parent):
+    tag_name: ClassVar[str] = "removeCrew"
+    clone: bool = Field(True, description="True means you are able to clone them")
+    text: Text = None
+
+    @classmethod
+    def from_elem(cls, e: Element):
+        if len(e) == 0:
+            return super().from_elem(e)
+        kw = {}
+        for sub in cls._xml_to_model(e, kw):
+            match sub:
+                case Element(tag="clone" as t):
+                    kw[t] = bool(sub.text.strip())
+                case _:
+                    raise Sad.from_sub_elem(e, sub)
+        return cls(**kw)
+
+
+class Environment(JustAttribs, Child):
+    tag_name: ClassVar[str] = "environment"
     type_: str = Field(alias="type")
 
 
-class Ship(JustAttribs, ElementModel):
-    tag_name = "ship"
+class Ship(JustAttribs, Child):
+    tag_name: ClassVar[str] = "ship"
     """
     Note that this can be used as a "diff" 
     """
@@ -88,8 +96,8 @@ class Ship(JustAttribs, ElementModel):
     hostile: bool = False
 
 
-class Fleet(ElementModel):
-    tag_name = "fleet"
+class Fleet(Child):
+    tag_name: ClassVar[str] = "fleet"
     text: str
 
     @classmethod
@@ -98,7 +106,7 @@ class Fleet(ElementModel):
 
 
 class Choice(ElementModel):
-    tag_name = "choice"
+    tag_name: ClassVar[str] = "choice"
     hidden: bool = False
     text: Text
     event: "Event"
@@ -121,7 +129,7 @@ class Choice(ElementModel):
 
 
 class EventModifyItem(JustAttribs, ElementModel):
-    tag_name = "item"
+    tag_name: ClassVar[str] = "item"
     """
     This is an element at event/item_modify/item. This defines when an event temporarily
      affects your subsystems.
@@ -131,16 +139,16 @@ class EventModifyItem(JustAttribs, ElementModel):
     max: int = None
 
 
-class Status(JustAttribs, ElementModel):
-    tag_name = "status"
+class Status(JustAttribs, Child):
+    tag_name: ClassVar[str] = "status"
     target: str
     type_: str = Field(alias="type")
     system: str
     amount: int
 
 
-class AutoReward(ElementModel):
-    tag_name = "autoReward"
+class AutoReward(Child):
+    tag_name: ClassVar[str] = "autoReward"
     level: str
     text: str
 
@@ -152,16 +160,16 @@ class AutoReward(ElementModel):
         return cls(**kw)
 
 
-class Boarders(JustAttribs, ElementModel):
-    tag_name = "boarders"
+class Boarders(JustAttribs, Child):
+    tag_name: ClassVar[str] = "boarders"
     breach: bool = False
     min: int
     max: int
     class_: str = Field(alias="class")
 
 
-class Quest(ElementModel):
-    tag_name = "quest"
+class Quest(Child):
+    tag_name: ClassVar[str] = "quest"
     event: str
 
     @classmethod
@@ -169,14 +177,14 @@ class Quest(ElementModel):
         return cls(event=e.attrib["event"])
 
 
-class Image(JustAttribs, ElementModel):
-    tag_name = "img"
+class Image(JustAttribs, Child):
+    tag_name: ClassVar[str] = "img"
     back: str = None
     planet: str = None
 
 
-class Upgrade(JustAttribs, ElementModel):
-    tag_name = "upgrade"
+class Upgrade(JustAttribs, Child):
+    tag_name: ClassVar[str] = "upgrade"
     amount: int
     system: str
 
@@ -190,7 +198,16 @@ class Upgrade(JustAttribs, ElementModel):
 @Text.attach
 @Fleet.attach
 @Status.attach
-class Event(ElementModel):
+@Augment.attach
+@Damage.attach(destination="loot")
+@RemoveCrew.attach(destination="loot")
+@Remove.attach(destination="loot")
+@Drone.attach(destination="loot")
+@Weapon.attach(destination="loot")
+@Augment.attach(destination="loot")
+@CrewMember.attach(destination="loot")
+@Environment.attach
+class Event(Parent):
     tag_name: ClassVar[str] = "event"
     name: str = None
     text: Text = None
@@ -225,14 +242,10 @@ class Event(ElementModel):
             match sub:
                 case Element(tag=Choice.tag_name):
                     choices.append(Choice.from_elem(sub))
-                case Element(tag=tag) if tag in EventLoot._tag_set:
-                    kls = EventLoot._dependents[tag]
-                    loot.append(kls.from_elem(sub))
                 case Element(tag="item_modify"):
                     # item_modify seems to be a dumb list, so just using a dumb list
                     kw["item_modify"] = [EventModifyItem.from_elem(i) for i in sub]
-                case Element(tag=Environment.tag_name):
-                    kw["environment"] = Environment.from_elem(sub)
+
                 # booleans
                 case Element(tag=t) if t in {
                     "distressBeacon",
@@ -250,17 +263,6 @@ class Event(ElementModel):
                     raise Sad.from_sub_elem(e, sub)
 
         return cls(**kw)
-
-    @classmethod
-    def _xml_to_model(cls, e: Element, kw: dict[str, Any]) -> Iterator[Element]:
-        """This iterates over the sub elements and yields the ones it doesn't handle"""
-        for sub in e:
-            match sub:
-                case Element(tag=tag) if tag in cls._tag_set:
-                    kls: ElementModel = cls._dependents[tag]
-                    kw[kls.py_tag_name()] = kls.from_elem(sub)
-                case _:
-                    yield sub
 
 
 Choice.update_forward_refs()
