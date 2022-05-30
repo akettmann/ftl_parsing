@@ -5,6 +5,7 @@ from pydantic import Field
 
 from .base import Child, ElementModel, JustAttribs, Parent
 from .loot import Item, Augment, Weapon, Drone, Remove, CrewMember, Damage, RemoveCrew
+from .ship import Ship, Fleet
 from .text import Text
 from ..exceptions import Sad
 
@@ -12,24 +13,6 @@ from ..exceptions import Sad
 class Environment(JustAttribs, Child):
     tag_name: ClassVar[str] = "environment"
     type_: str = Field(alias="type")
-
-
-class Ship(JustAttribs, Child):
-    tag_name: ClassVar[str] = "ship"
-    """
-    Note that this can be used as a "diff" 
-    """
-    load: str = None
-    hostile: bool = False
-
-
-class Fleet(Child):
-    tag_name: ClassVar[str] = "fleet"
-    text: str
-
-    @classmethod
-    def from_elem(cls, e: Element):
-        return cls(text=e.text)
 
 
 class Choice(Child):
