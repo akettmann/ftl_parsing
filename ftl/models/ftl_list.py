@@ -3,7 +3,8 @@ from abc import ABC
 from random import choice
 from typing import Any, TypeVar
 from xml.etree.ElementTree import Element
-
+from rich.text import Text as RText
+from rich.columns import Columns
 from .base import ElementModel, Parent
 
 M = TypeVar("M")
@@ -31,3 +32,6 @@ class BaseList(Parent, ABC):
         it is going to content"""
         cls._dependents.add(tag_name)
         cls._child_tags[tag_name] = (kls, "content")
+
+    def __rich__(self) -> Columns:
+        return Columns(self.contents)
