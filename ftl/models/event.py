@@ -3,9 +3,7 @@ from typing import Any, ClassVar
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
-from rich.markdown import Markdown
-from rich.panel import Panel
-from rich.table import Table, Column
+from rich.table import Table
 from rich.text import Text as RText
 
 from .base import Child, ElementModel, JustAttribs, Parent
@@ -47,14 +45,21 @@ class Choice(Child):
 
     def render(self) -> RText:
         r = self.text.render()
+        if not isinstance(r, str):
+            # This is not just a string, return it as is
+            return r
         if self.hidden is True and self.req is None:
             # TODO: Support looking up an event list, looking at the itemmodify tag
             #  and seeing what one of them costs and hope they all cost that?
             return RText(r)
+
         m = self._PAREN_RE.fullmatch(r)
         if m is None:
             return RText.assemble(f"👻 {r}")
-        return RText.assemble((m.group("req"), "blue"), " 👻", m.group("text"))
+        return RText.assemble((m.group("req"), "blue1"), " 👻", m.group("text"))
+
+    def __rich__(self):
+        return self.render()
 
 
 class EventModifyItem(JustAttribs, ElementModel):
@@ -139,7 +144,7 @@ class Upgrade(JustAttribs, Child):
 @Environment.attach
 class Event(Parent):
     tag_name: ClassVar[str] = "event"
-    name: str = None
+    name: str = ""
     text: Text = None
     ship: Ship = None
     choices: list[Choice]
@@ -168,6 +173,8 @@ class Event(Parent):
     img: Image = None
     upgrade: Upgrade = None
     load: str = None  # TODO: Need to implement a draw method or something?
+    min: int = None
+    max: int = None
 
     @classmethod
     def from_elem(cls, e: Element):
@@ -202,14 +209,27 @@ class Event(Parent):
     def __rich__(self):
         event_table = Table(self.name, expand=False, min_width=80)
         event_table.add_row(self.text)
-        event_table.add_row()
+        event_table.add_row(self._modifier_row())
         event_table.add_row()
         for idx, choice in enumerate(self.choices):
             t = RText(f"{idx + 1}. ")
             t.append(choice.render())
             event_table.add_row(t)
+        if len(self.choices) == 0:
+            if self.ship:
+                event_table.add_row("Fight Ship!!!")
+            else:
+                event_table.add_row("1. Continue...")
 
         return event_table
+
+    def _modifier_row(self):
+        t = RText()
+        if self.distress_beacon:
+            t.append("Distress Beacon", "yellow")
+        if self.ship:
+            t.append("Ship Detected", "red")
+        return t
 
 
 Choice.update_forward_refs()
