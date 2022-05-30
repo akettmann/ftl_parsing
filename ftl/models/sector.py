@@ -5,7 +5,8 @@ from xml.etree.ElementTree import Element
 from pydantic import conint, Field
 
 from ..exceptions import Sad
-from .base import ElementModel, JustAttribs, StringLookup
+from .base import ElementModel, JustAttribs
+from .text import StringLookup
 
 
 class Track(ElementModel):

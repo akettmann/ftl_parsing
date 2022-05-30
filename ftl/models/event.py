@@ -1,85 +1,12 @@
-from abc import ABC
-from typing import Any, ClassVar, Iterator, Generic
+from typing import Any, ClassVar
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
 
-from .base import ElementModel, JustAttribs, StringLookup, Tagged, Child, Parent
+from .base import Child, ElementModel, JustAttribs, Parent
+from .loot import Item, Augment, Weapon, Drone, Remove, CrewMember, Damage, RemoveCrew
+from .text import Text
 from ..exceptions import Sad
-
-
-class Item(StringLookup, JustAttribs, Child, ABC):
-    """This holds the name of a loot table that an item will come from as a result of an
-    event"""
-
-
-class Augment(Item):
-    tag_name: ClassVar[str] = "augment"
-
-
-class Weapon(Item):
-    tag_name: ClassVar[str] = "weapon"
-
-
-class Drone(Item):
-    tag_name: ClassVar[str] = "drone"
-
-
-class Remove(Item):
-    tag_name: ClassVar[str] = "remove"
-    """
-    This says what you will lose when this event happens, kind of Anti-Loot
-    """
-
-
-class CrewMember(Item):
-    """People are things too apparently"""
-
-    tag_name: ClassVar[str] = "crewMember"
-    amount: int
-    class_: str = Field(None, alias="class")
-
-
-class Damage(Remove):
-    tag_name: ClassVar[str] = "damage"
-
-
-class EventLoot(Parent, ABC):
-    """Using this class to track, not to actually create"""
-
-    pass
-
-
-class Text(Child):
-    tag_name: ClassVar[str] = "text"
-    text: str = None
-
-    @classmethod
-    def from_elem(cls, e: Element):
-        kw = e.attrib.copy()
-        if e.text and e.text.strip():
-            kw["text"] = e.text.strip()
-        return cls(**kw)
-
-
-@Text.attach
-class RemoveCrew(Remove, Parent):
-    tag_name: ClassVar[str] = "removeCrew"
-    clone: bool = Field(True, description="True means you are able to clone them")
-    text: Text = None
-
-    @classmethod
-    def from_elem(cls, e: Element):
-        if len(e) == 0:
-            return super().from_elem(e)
-        kw = {}
-        for sub in cls._xml_to_model(e, kw):
-            match sub:
-                case Element(tag="clone" as t):
-                    kw[t] = bool(sub.text.strip())
-                case _:
-                    raise Sad.from_sub_elem(e, sub)
-        return cls(**kw)
 
 
 class Environment(JustAttribs, Child):
@@ -105,7 +32,7 @@ class Fleet(Child):
         return cls(text=e.text)
 
 
-class Choice(ElementModel):
+class Choice(Child):
     tag_name: ClassVar[str] = "choice"
     hidden: bool = False
     text: Text
@@ -189,6 +116,7 @@ class Upgrade(JustAttribs, Child):
     system: str
 
 
+@Choice.attach(destination="choices")
 @Upgrade.attach
 @Image.attach
 @Quest.attach
@@ -224,7 +152,7 @@ class Event(Parent):
     unique: bool = False
     auto_reward: AutoReward = None
     item_modify: list[EventModifyItem] = Field(default_factory=list)
-    loot: list[Item | CrewMember | Remove] = Field(default_factory=list)
+    loot: list[Item] = Field(default_factory=list)
     modify_pursuit: int = None
     boarders: Boarders = None
     statuses: list[Status] = Field(default_factory=list)
@@ -235,13 +163,11 @@ class Event(Parent):
     @classmethod
     def from_elem(cls, e: Element):
         kw: dict[str, Any] = e.attrib.copy()
-        kw["choices"] = choices = []
-        kw["loot"] = loot = []
-        kw["statuses"] = statuses = []
+        kw["choices"] = []
+        kw["loot"] = []
+        kw["statuses"] = []
         for sub in cls._xml_to_model(e, kw):
             match sub:
-                case Element(tag=Choice.tag_name):
-                    choices.append(Choice.from_elem(sub))
                 case Element(tag="item_modify"):
                     # item_modify seems to be a dumb list, so just using a dumb list
                     kw["item_modify"] = [EventModifyItem.from_elem(i) for i in sub]

@@ -3,7 +3,8 @@ from xml.etree.ElementTree import Element
 
 from pydantic import Field
 
-from .base import ElementModel, JustAttribs, StringLookup
+from .base import ElementModel, JustAttribs
+from .text import StringLookup
 from ..exceptions import Sad
 
 

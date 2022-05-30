@@ -1,15 +1,14 @@
-from abc import abstractmethod, ABC
-from functools import wraps
-from typing import ClassVar, Type, TypeVar, Any, Iterator
+from abc import ABC, abstractmethod
+from typing import Any, ClassVar, Iterator, Type, TypeVar
 from xml.etree.ElementTree import Element
 
 from inflection import underscore
-from pydantic import BaseModel as BaseM, Field
+from pydantic import BaseModel as BaseM
 
 # noinspection PyProtectedMember
 from pydantic.main import ModelMetaclass
 
-from ..data import STRING_DATA
+from ftl.exceptions import Sad
 
 
 class TrackDependentsMeta(ModelMetaclass):
@@ -60,18 +59,6 @@ class ElementModel(Tagged):
         raise NotImplementedError()
 
 
-class StringLookup(BaseModel):
-    id_: str = Field(None, alias="id")
-    name: str = None
-
-    @staticmethod
-    def _lookup(name: str) -> str:
-        return STRING_DATA.get(name, "STRING NOT FOUND")
-
-    def __str__(self):
-        return self._lookup(self.id_)
-
-
 M = TypeVar("M", bound=ElementModel)
 
 
@@ -83,6 +70,19 @@ class Parent(Tagged, ABC, metaclass=TrackDependentsMeta):
     def adopt(cls, kls, tag_name: str, destination: str):
         cls._dependents.add(tag_name)
         cls._child_tags[tag_name] = (kls, destination)
+
+    @classmethod
+    def _from_elem(cls, e: Element, kw: dict = None):
+        """This default implementation will take care of any elements handled by
+        Children that are attached, though the class still needs to have the field
+        required."""
+        kw: dict[str, Any] = kw or e.attrib.copy()
+        for sub in cls._xml_to_model(e, kw):
+            match sub:
+                case _:
+                    raise Sad.from_sub_elem(e, sub)
+        # noinspection PyArgumentList
+        return cls(**kw)
 
     @classmethod
     def _xml_to_model(cls, e: Element, kw: dict[str, Any]) -> Iterator[Element]:

@@ -5,6 +5,7 @@ from .base import ElementModel, M
 from .event import Event
 from .sector import SectorDescription, SectorType
 from .blueprints import ShipBlueprint
+from .text import TextList
 from ..data import RAW_DATA, STRING_DATA
 
 __all__ = "FTL"
@@ -24,6 +25,7 @@ class _FTL(ElementModel):
     sector_types: dict[str, SectorType]
     events: dict[str, Event]
     ship_blueprints: dict[str, ShipBlueprint]
+    text_lists: dict[str, TextList]
     _string_lookup: dict[str:str]
 
     @classmethod
@@ -41,6 +43,7 @@ class _FTL(ElementModel):
             "ship_blueprints": _make_element_dict(
                 ShipBlueprint, *e.iter("shipBlueprint")
             ),
+            "text_lists": _make_element_dict(TextList, *e.iter("textList")),
         }
         return cls(**kwargs)
 
