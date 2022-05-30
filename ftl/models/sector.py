@@ -10,6 +10,8 @@ from .text import StringLookup
 
 
 class Track(ElementModel):
+    """Music that can play"""
+
     # noinspection Pydantic
     tag_name: ClassVar[str] = "track"
     __root__: str
