@@ -39,7 +39,7 @@ class _FTL(ElementModel):
                 SectorType, *e.findall(SectorType.tag_name)
             ),
             # recursively finds events where it has an attribute `name` defined
-            "events": _make_element_dict(Event, *e.findall(".//event[@name]")),
+            "events": _make_element_dict(Event, *e.findall("./event[@name]")),
             "ship_blueprints": _make_element_dict(
                 ShipBlueprint, *e.iter("shipBlueprint")
             ),
