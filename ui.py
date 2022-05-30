@@ -1,10 +1,10 @@
 from typing import Type
 
 from rich.console import RenderableType
+from textual import events
 from textual.driver import Driver
 from textual.reactive import Reactive
 from textual.widget import Widget
-
 
 from ftl import FTL
 from textual.app import App
@@ -17,7 +17,9 @@ class EventWidget(Widget):
 
     def __init__(self, name: str | None = None) -> None:
         super().__init__(name)
-        self.idx = 0
+        self.idx = self._event_list.index(self._events.get("ENGI_UNLOCK_1"))
+        self._current = self._current.choices[0]
+        self.refresh()
 
     def inc(self):
         self.idx += 1
@@ -36,6 +38,13 @@ class EventWidget(Widget):
 
     def render(self) -> RenderableType:
         return self._current
+
+    def press(self, i: int):
+        choices = self._current.choices
+        if not choices and i == 1 and self._current.ship:
+            self._current = self._current.ship
+        if 0 < i <= len(choices):
+            self._current = choices[i - 1]
 
 
 class EventApp(App):
@@ -62,5 +71,9 @@ class EventApp(App):
     def action_dec(self):
         self._event_widget.dec()
 
+    async def on_key(self, event: events.Key) -> None:
+        if event.key.isdigit():
+            self._event_widget.press(int(event.key))
 
-EventApp.run("textual.log")
+
+EventApp.run(log="textual.log")
