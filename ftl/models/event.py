@@ -1,7 +1,12 @@
+import re
 from typing import Any, ClassVar
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
+from rich.markdown import Markdown
+from rich.panel import Panel
+from rich.table import Table, Column
+from rich.text import Text as RText
 
 from .base import Child, ElementModel, JustAttribs, Parent
 from .loot import Augment, CrewMember, Damage, Drone, Item, Remove, RemoveCrew, Weapon
@@ -17,11 +22,13 @@ class Environment(JustAttribs, Child):
 
 
 class Choice(Child):
+    _PAREN_RE = re.compile(r"\((?P<req>[\w ]+)\)(?P<text>.*$)")
     tag_name: ClassVar[str] = "choice"
-    hidden: bool = False
+    hidden: bool = None
     text: Text
     event: "Event"
     choice: "Choice" = None
+    req: str = None
 
     @classmethod
     def from_elem(cls, e: Element):
@@ -37,6 +44,17 @@ class Choice(Child):
                 case _:
                     raise Sad.from_elem(sub)
         return cls(**kw)
+
+    def render(self) -> RText:
+        r = self.text.render()
+        if self.hidden is True and self.req is None:
+            # TODO: Support looking up an event list, looking at the itemmodify tag
+            #  and seeing what one of them costs and hope they all cost that?
+            return RText(r)
+        m = self._PAREN_RE.fullmatch(r)
+        if m is None:
+            return RText.assemble(f"👻 {r}")
+        return RText.assemble((m.group("req"), "blue"), " 👻", m.group("text"))
 
 
 class EventModifyItem(JustAttribs, ElementModel):
@@ -182,7 +200,16 @@ class Event(Parent):
         return cls(**kw)
 
     def __rich__(self):
-        pass
+        event_table = Table(self.name, expand=False, min_width=80)
+        event_table.add_row(self.text)
+        event_table.add_row()
+        event_table.add_row()
+        for idx, choice in enumerate(self.choices):
+            t = RText(f"{idx + 1}. ")
+            t.append(choice.render())
+            event_table.add_row(t)
+
+        return event_table
 
 
 Choice.update_forward_refs()
