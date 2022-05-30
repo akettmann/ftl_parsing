@@ -13,6 +13,7 @@ from ..exceptions import Sad
 class Environment(JustAttribs, Child):
     tag_name: ClassVar[str] = "environment"
     type_: str = Field(alias="type")
+    target: str = None
 
 
 class Choice(Child):
@@ -142,6 +143,12 @@ class Event(Parent):
     quest: Quest = None
     image: Image = None
     unlock_ship: int = Field(None, alias="unlockShip")
+    environment: Environment = None
+    augment: Augment = None
+    status: Status = None
+    fleet: Fleet = None
+    img: Image = None
+    upgrade: Upgrade = None
 
     @classmethod
     def from_elem(cls, e: Element):

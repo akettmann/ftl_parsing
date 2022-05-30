@@ -3,7 +3,7 @@ from typing import Any, ClassVar, Iterator, Type, TypeVar
 from xml.etree.ElementTree import Element
 
 from inflection import underscore
-from pydantic import BaseModel as BaseM
+from pydantic import BaseModel as BaseM, Extra
 
 # noinspection PyProtectedMember
 from pydantic.main import ModelMetaclass
@@ -30,6 +30,7 @@ class JustAttribs:
 class BaseModel(BaseM):
     class Config:
         allow_population_by_field_name = True
+        extra = Extra.forbid
 
 
 class Tagged(BaseModel):
@@ -68,6 +69,10 @@ class Parent(Tagged, ABC, metaclass=TrackDependentsMeta):
 
     @classmethod
     def adopt(cls, kls, tag_name: str, destination: str):
+        if destination not in cls.__fields__:
+            raise ValueError(
+                f"{cls.__name__}.{destination} does not exist, please define this field"
+            )
         cls._dependents.add(tag_name)
         cls._child_tags[tag_name] = (kls, destination)
 
