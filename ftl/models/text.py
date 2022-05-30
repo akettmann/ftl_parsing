@@ -1,15 +1,13 @@
 from abc import ABC
-from random import choice
-from typing import Any, ClassVar
+from typing import ClassVar
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
+from rich.console import RenderableType
 
 from .ftl_list import BaseList
 from ..data import STRING_DATA
-from .base import Child, Parent, Tagged
-from ..exceptions import Sad
-from rich.text import Text as RText
+from .base import Child, Tagged
 
 
 class StringLookup(Tagged, ABC):
@@ -36,18 +34,16 @@ class Text(Child, StringLookup):
             kw["text"] = e.text.strip()
         return cls(**kw)
 
-    def _load(self) -> str:
+    def get_ref(self) -> "TextList":
         from ftl import FTL
 
-        txt = FTL.text_lists.get(self.load).draw().render()
+        return FTL.text_lists.get(self.load)
 
-        return f":game_die: {txt}"
+    def render(self) -> RenderableType:
+        return self.text or self._lookup() or self.get_ref()
 
-    def render(self) -> str:
-        return self.text or self._lookup() or self._load()
-
-    def __rich__(self) -> RText:
-        return RText(self.render())
+    def __rich__(self) -> RenderableType:
+        return self.render()
 
 
 @Text.attach()
