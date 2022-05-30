@@ -9,6 +9,7 @@ from .ftl_list import BaseList
 from ..data import STRING_DATA
 from .base import Child, Parent, Tagged
 from ..exceptions import Sad
+from rich.text import Text as RText
 
 
 class StringLookup(Tagged, ABC):
@@ -45,11 +46,8 @@ class Text(Child, StringLookup):
     def render(self) -> str:
         return self.text or self._lookup() or self._load()
 
-    def __rich__(self) -> str:
-        out = self.render()
-        if out is None:
-            raise Sad()
-        return out
+    def __rich__(self) -> RText:
+        return RText(self.render())
 
 
 @Text.attach()
