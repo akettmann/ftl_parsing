@@ -8,7 +8,7 @@ from pydantic import BaseModel as BaseM, Extra
 # noinspection PyProtectedMember
 from pydantic.main import ModelMetaclass
 
-from ftl.exceptions import Sad
+from ..exceptions import Sad
 
 
 class TrackDependentsMeta(ModelMetaclass):
@@ -30,7 +30,7 @@ class JustAttribs:
 class BaseModel(BaseM):
     class Config:
         allow_population_by_field_name = True
-        extra = Extra.forbid
+        # extra = Extra.forbid
 
 
 class Tagged(BaseModel):
@@ -74,6 +74,9 @@ class Parent(Tagged, ABC, metaclass=TrackDependentsMeta):
                 f"{cls.__name__}.{destination} does not exist, please define this field"
             )
         cls._dependents.add(tag_name)
+        # TODO: Maybe do a little determination here using cls.__fields__ now to see
+        #  if the destination is a container (list) or an attribute, make destination
+        #  here a callable instead and pass in the class? or is that dumb?
         cls._child_tags[tag_name] = (kls, destination)
 
     @classmethod

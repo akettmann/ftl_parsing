@@ -4,8 +4,8 @@ from xml.etree.ElementTree import Element
 from pydantic import Field
 
 from .base import Child, ElementModel, JustAttribs, Parent
-from .loot import Item, Augment, Weapon, Drone, Remove, CrewMember, Damage, RemoveCrew
-from .ship import Ship, Fleet
+from .loot import Augment, CrewMember, Damage, Drone, Item, Remove, RemoveCrew, Weapon
+from .ship import Fleet, Ship
 from .text import Text
 from ..exceptions import Sad
 
@@ -149,6 +149,7 @@ class Event(Parent):
     fleet: Fleet = None
     img: Image = None
     upgrade: Upgrade = None
+    load: str = None  # TODO: Need to implement a draw method or something?
 
     @classmethod
     def from_elem(cls, e: Element):
@@ -179,6 +180,9 @@ class Event(Parent):
                     raise Sad.from_sub_elem(e, sub)
 
         return cls(**kw)
+
+    def __rich__(self):
+        pass
 
 
 Choice.update_forward_refs()

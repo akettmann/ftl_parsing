@@ -5,6 +5,7 @@ from xml.etree.ElementTree import Element
 
 from pydantic import Field
 
+from .ftl_list import BaseList
 from ..data import STRING_DATA
 from .base import Child, Parent, Tagged
 from ..exceptions import Sad
@@ -51,17 +52,7 @@ class Text(Child, StringLookup):
         return out
 
 
-@Text.attach
-class TextList(Parent, StringLookup):
+@Text.attach()
+class TextList(BaseList):
     tag_name: ClassVar[str] = "textList"
-    text: list[Text] = Field(default_factory=list)
-
-    @classmethod
-    def from_elem(cls, e: Element):
-        kw: dict[str, Any] = e.attrib.copy()
-        kw["text"] = list()
-        return cls._from_elem(e, kw)
-
-    def draw(self) -> Text:
-        """draws a string from its list, returns the fetched instance"""
-        return choice(self.text)
+    name: str
