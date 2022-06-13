@@ -1,14 +1,22 @@
+import re
 from abc import ABC, abstractmethod
-from typing import Any, ClassVar, Iterator, Type, TypeVar
+from typing import Any, ClassVar, Iterator, Type, TypeVar, Set
 from xml.etree.ElementTree import Element
 
+import inflection
 from inflection import underscore
-from pydantic import BaseModel as BaseM, Extra
+from pydantic import BaseModel as BaseM
 
 # noinspection PyProtectedMember
 from pydantic.main import ModelMetaclass
 
 from ..exceptions import Sad
+
+RESERVED = {"id_": "id", "type_": "type", "class_": "class"}
+
+
+def special_camel(s: str):
+    return RESERVED.get(s) or inflection.camelize(s, uppercase_first_letter=False)
 
 
 class TrackDependentsMeta(ModelMetaclass):
@@ -30,7 +38,12 @@ class JustAttribs:
 class BaseModel(BaseM):
     class Config:
         allow_population_by_field_name = True
+        alias_generator = special_camel
         # extra = Extra.forbid
+
+    def __repr_args__(self) -> "ReprArgs":
+        attrs = ((s, getattr(self, s)) for s in self.__slots__)
+        return [(a, v) for a, v in attrs if v is not None]
 
 
 class Tagged(BaseModel):
@@ -69,7 +82,7 @@ class Parent(Tagged, ABC, metaclass=TrackDependentsMeta):
 
     @classmethod
     def adopt(cls, kls, tag_name: str, destination: str):
-        if destination not in cls.__fields__:
+        if destination not in cls.fields_and_aliases:
             raise ValueError(
                 f"{cls.__name__}.{destination} does not exist, please define this field"
             )
@@ -106,6 +119,14 @@ class Parent(Tagged, ABC, metaclass=TrackDependentsMeta):
                         kw[destination] = kls.from_elem(sub)
                 case _:
                     yield sub
+
+    @classmethod
+    @property
+    def fields_and_aliases(cls) -> Set[str]:
+        s = {f.name for f in cls.__fields__.values()}
+        s.update((f.alias for f in cls.__fields__.values() if f.has_alias))
+        s.update((cls.Config.alias_generator(f.name) for f in cls.__fields__.values()))
+        return s
 
 
 class Child(Tagged, ABC):

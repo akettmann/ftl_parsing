@@ -1,7 +1,7 @@
 from typing import ClassVar
 from xml.etree.ElementTree import Element
 
-from ftl.models.base import JustAttribs, Child
+from .base import JustAttribs, Child
 
 
 class Ship(JustAttribs, Child):

@@ -1,5 +1,5 @@
 import re
-from typing import Any, ClassVar
+from typing import Any, ClassVar, Sequence
 from xml.etree.ElementTree import Element
 
 from pydantic import Field
@@ -43,7 +43,7 @@ class Choice(Child):
                     raise Sad.from_elem(sub)
         return cls(**kw)
 
-    def render(self) -> RText:
+    def render(self):
         r = self.text.render()
         if not isinstance(r, str):
             # This is not just a string, return it as is
@@ -165,7 +165,7 @@ class Event(Parent):
     statuses: list[Status] = Field(default_factory=list)
     quest: Quest = None
     image: Image = None
-    unlock_ship: int = Field(None, alias="unlockShip")
+    unlock_ship: int = None
     environment: Environment = None
     augment: Augment = None
     status: Status = None
@@ -209,7 +209,9 @@ class Event(Parent):
     def __rich__(self):
         event_table = Table(self.name, expand=False, min_width=80)
         event_table.add_row(self.text)
-        event_table.add_row(self._modifier_row())
+        event_table.add_row()
+        for row in self._modifier_rows():
+            event_table.add_row(row)
         event_table.add_row()
         for idx, choice in enumerate(self.choices):
             t = RText(f"{idx + 1}. ")
@@ -223,13 +225,11 @@ class Event(Parent):
 
         return event_table
 
-    def _modifier_row(self):
-        t = RText()
-        if self.distress_beacon:
-            t.append("Distress Beacon", "yellow")
+    def _modifier_rows(self):
         if self.ship:
-            t.append("Ship Detected", "red")
-        return t
+            yield "⚠ [yellow]Ship Detected[/]"
+        if self.distress_beacon:
+            yield "🆘 [red]Distress[/]"
 
 
 Choice.update_forward_refs()

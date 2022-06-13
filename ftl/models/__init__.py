@@ -4,8 +4,9 @@ from xml.etree.ElementTree import Element
 from .base import ElementModel, M
 from .event import Event
 from .sector import SectorDescription, SectorType
-from .blueprints import ShipBlueprint
+from .ship_blueprints import ShipBlueprint
 from .text import TextList
+from .weapon_blueprints import WeaponBlueprint
 from ..data import RAW_DATA, STRING_DATA
 
 __all__ = "FTL"
@@ -26,6 +27,7 @@ class _FTL(ElementModel):
     events: dict[str, Event]
     ship_blueprints: dict[str, ShipBlueprint]
     text_lists: dict[str, TextList]
+    # weapon_blueprints: dict[str, WeaponBlueprint]
     _string_lookup: dict[str:str]
 
     @classmethod
@@ -44,6 +46,9 @@ class _FTL(ElementModel):
                 ShipBlueprint, *e.iter("shipBlueprint")
             ),
             "text_lists": _make_element_dict(TextList, *e.iter("textList")),
+            # "weapon_blueprints": _make_element_dict(
+            #     WeaponBlueprint, *e.iter("weaponBlueprint")
+            # ),
         }
         return cls(**kwargs)
 
